@@ -180,12 +180,12 @@ def main():
 
                         file_name = f"physics_student_{int(time.time())}.jpg"
                         
-                        # ҰСАҚ МӘТІНДЕР АНЫҚ КӨРІНУІ ҮШІН АЖЫРАТЫМДЫЛЫҚ КӨТЕРІЛДІ (2000px)
-                        stitched_image.thumbnail((2000, 2000 * len(images))) 
+                        # Орташа ажыратымдылық (файл жеңіл болуы үшін 1500px)
+                        stitched_image.thumbnail((1500, 1500 * len(images))) 
                         
                         img_byte_arr = io.BytesIO()
-                        # СУРЕТ САПАСЫ 95%-ҒА КӨТЕРІЛДІ
-                        stitched_image.save(img_byte_arr, format='JPEG', quality=95, optimize=True)
+                        # Сурет сапасы 80% (Жүктеу тез болуы үшін оңтайлы сапа)
+                        stitched_image.save(img_byte_arr, format='JPEG', quality=80, optimize=True)
                         compressed_bytes_data = img_byte_arr.getvalue()
                         
                         storage_url = f"{URL}/storage/v1/object/exam_images/{file_name}"
