@@ -36,7 +36,7 @@ def main():
     if 'cam_key' not in st.session_state:
         st.session_state.cam_key = 0 
 
-    # 2. СТИЛЬ (Дизайн және Анти-көшіру)
+    # 2. СТИЛЬ (Дизайн)
     st.markdown("""
         <style>
         body { -webkit-user-select: none; user-select: none; }
@@ -60,7 +60,7 @@ def main():
             st.session_state.cam_key += 1
             st.rerun()
     else:
-        st.info("📝 **Нұсқаулық:** Жұмысыңыз бірнеше беттен тұрса, әр бетті жеке камераға түсіріп, «Тізімге қосу» батырмасын басыңыз. Соңында «Тапсыру» батырмасын басыңыз. Басқа терезеге өтпеңіз!")
+        st.info("📝 **Нұсқаулық:** Жұмысыңыз бірнеше беттен тұрса, әр бетті жеке түсіріп немесе жүктеп, «Тізімге қосу» батырмасын басыңыз. Соңында «Тапсыру» батырмасын басыңыз.")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -70,43 +70,80 @@ def main():
             s_class = st.selectbox("🏫 Сыныбыңыз:", ["8-A", "8-B", "8-C", "8-D", "8-E", "8-F"])
 
         if name:
-            # АНТИ-ЧИТ ЖҮЙЕСІ
+            # 🛡️ АҚЫЛДЫ АНТИ-ЧИТ ЖҮЙЕСІ (3 ескерту + қорғаныс)
             components.html(f"""
                 <script>
+                // Оң жақ батырманы (Right-click) және көшіруді бұғаттау
+                document.addEventListener('contextmenu', event => event.preventDefault());
+                document.addEventListener('keydown', function(e) {{
+                    if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'p' || e.key === 'u' || e.key === 's')) {{
+                        e.preventDefault();
+                    }}
+                }});
+
+                // Ескертулер санын сақтау (Оқушы қайта кірсе де сақталады)
+                let cheatCount = sessionStorage.getItem('cheatCount_{name}') || 0;
+                cheatCount = parseInt(cheatCount);
                 let isSubmitting = false;
+
+                // Басқа терезеге өтуді қадағалау
                 document.addEventListener("visibilitychange", function() {{
                     if (document.hidden && !isSubmitting) {{
-                        const payload = {{
-                            student_name: "{name}",
-                            student_class: "{s_class}",
-                            status: "cheated",
-                            answers: {{ "subject": "physics" }},
-                            ai_feedback: "🚫 ЖҰМЫС ЖОЙЫЛДЫ: Анти-чит жүйесі басқа терезеге өткеніңізді анықтады."
-                        }};
-                        fetch('{URL}/rest/v1/{TABLE_NAME}', {{
-                            method: 'POST',
-                            headers: {{ 'apikey': '{KEY}', 'Authorization': 'Bearer {KEY}', 'Content-Type': 'application/json' }},
-                            body: JSON.stringify(payload)
-                        }}).then(() => {{ 
-                            isSubmitting = true;
-                            window.parent.location.reload(); 
-                        }});
+                        cheatCount++;
+                        sessionStorage.setItem('cheatCount_{name}', cheatCount);
+
+                        if (cheatCount < 3) {{
+                            // Жай ғана ескерту береміз (1 немесе 2-ші рет)
+                            alert("⚠️ АНТИ-ЧИТ ЕСКЕРТУІ (" + cheatCount + "/3):\\n\\nҚұрметті оқушы, тест кезінде басқа терезеге өтуге немесе хабарлама оқуға қатаң тыйым салынады! Егер 3 рет қайталанса, жұмысыңыз автоматты түрде жойылады.");
+                        }} else {{
+                            // 3 рет бұзды - жұмысты біржолата бұғаттау
+                            alert("🚫 ЕРЕЖЕ ӨРЕСКЕЛ БҰЗЫЛДЫ:\\n\\nСіз 3 рет басқа терезеге өттіңіз. Жұмысыңыз нөлденді және мұғалімге хабарланды.");
+                            
+                            const payload = {{
+                                student_name: "{name}",
+                                student_class: "{s_class}",
+                                status: "cheated",
+                                answers: {{ "subject": "physics" }},
+                                ai_feedback: "🚫 ЖҰМЫС ЖОЙЫЛДЫ: Оқушы тест барысында басқа терезеге 3 реттен артық өтіп, ережені өрескел бұзды."
+                            }};
+                            
+                            fetch('{URL}/rest/v1/{TABLE_NAME}', {{
+                                method: 'POST',
+                                headers: {{ 'apikey': '{KEY}', 'Authorization': 'Bearer {KEY}', 'Content-Type': 'application/json' }},
+                                body: JSON.stringify(payload)
+                            }}).then(() => {{ 
+                                isSubmitting = true;
+                                sessionStorage.removeItem('cheatCount_{name}'); // Келесі тестке тазалау үшін
+                                window.parent.location.reload(); 
+                            }});
+                        }}
                     }}
                 }});
                 </script>
             """, height=0)
 
-            st.markdown("<div class='camera-box'><b>📸 Жұмысты суретке түсіру:</b></div>", unsafe_allow_html=True)
+            st.markdown("<div class='camera-box'><b>📸 Жұмысты суретке түсіру немесе жүктеу:</b></div>", unsafe_allow_html=True)
             
-            cam_image = st.camera_input("Дәптер бетін түсіріңіз", key=f"camera_{st.session_state.cam_key}")
+            # Екі бөлек қойынды (вкладка)
+            tab1, tab2 = st.tabs(["📂 Дайын суретті жүктеу (Ұсынылады)", "📸 Камерамен түсіру"])
             
-            if cam_image:
-                if st.button("➕ Осы суретті жұмысқа тіркеу", use_container_width=True):
-                    st.session_state.photos.append(cam_image.getvalue())
-                    st.session_state.cam_key += 1 
-                    st.rerun() 
+            with tab1:
+                uploaded_file = st.file_uploader("Телефоннан немесе компьютерден анық суретті таңдаңыз", type=["jpg", "jpeg", "png"], key=f"upload_{st.session_state.cam_key}")
+                if uploaded_file:
+                    if st.button("➕ Осы файлды жұмысқа тіркеу", use_container_width=True, key="btn_upload"):
+                        st.session_state.photos.append(uploaded_file.getvalue())
+                        st.session_state.cam_key += 1
+                        st.rerun()
 
-            # ТҮСІРІЛГЕН СУРЕТТЕРДІ КӨРСЕТУ
+            with tab2:
+                cam_image = st.camera_input("Дәптер бетін түсіріңіз", key=f"camera_{st.session_state.cam_key}")
+                if cam_image:
+                    if st.button("➕ Камерадағы суретті тіркеу", use_container_width=True, key="btn_cam"):
+                        st.session_state.photos.append(cam_image.getvalue())
+                        st.session_state.cam_key += 1 
+                        st.rerun() 
+
+            # ТҮСІРІЛГЕН СУРЕТТЕРДІ КӨРСЕТУ ЖӘНЕ ЖОЮ
             if st.session_state.photos:
                 st.write("---")
                 st.markdown(f"**Сіздің жұмысыңыз ({len(st.session_state.photos)} бет):**")
@@ -126,7 +163,7 @@ def main():
 
                 st.write("---")
                 
-                # ЖҰМЫСТЫ ТАПСЫРУ
+                # ЖҰМЫСТЫ ТАПСЫРУ (AI-ға жіберу)
                 if st.button("ЖҰМЫСТЫ ТАПСЫРУ ✅", type="primary", use_container_width=True):
                     with st.spinner("Суреттер біріктіріліп, мұғалімге жіберілуде..."):
                         images = [Image.open(io.BytesIO(img_bytes)).convert("RGB") for img_bytes in st.session_state.photos]
@@ -142,10 +179,13 @@ def main():
                             y_offset += img.height
 
                         file_name = f"physics_student_{int(time.time())}.jpg"
-                        stitched_image.thumbnail((1200, 1200 * len(images))) 
+                        
+                        # ҰСАҚ МӘТІНДЕР АНЫҚ КӨРІНУІ ҮШІН АЖЫРАТЫМДЫЛЫҚ КӨТЕРІЛДІ (2000px)
+                        stitched_image.thumbnail((2000, 2000 * len(images))) 
                         
                         img_byte_arr = io.BytesIO()
-                        stitched_image.save(img_byte_arr, format='JPEG', quality=70, optimize=True)
+                        # СУРЕТ САПАСЫ 95%-ҒА КӨТЕРІЛДІ
+                        stitched_image.save(img_byte_arr, format='JPEG', quality=95, optimize=True)
                         compressed_bytes_data = img_byte_arr.getvalue()
                         
                         storage_url = f"{URL}/storage/v1/object/exam_images/{file_name}"
